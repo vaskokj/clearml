@@ -36,7 +36,7 @@ class S3BucketConfig(object):
     extra_args = attrib(type=dict, default=None)
 
     def update(
-            self, key, secret, multipart=True, region=None, use_credentials_chain=False, token="", extra_args=None
+        self, key, secret, multipart=True, region=None, use_credentials_chain=False, token="", extra_args=None
     ):
         self.key = key
         self.secret = secret
@@ -55,7 +55,7 @@ class S3BucketConfig(object):
     @classmethod
     def from_list(cls, dict_list, log=None):
         if not isinstance(dict_list, (tuple, list)) or not all(
-                isinstance(x, dict) for x in dict_list
+            isinstance(x, dict) for x in dict_list
         ):
             raise ValueError("Expecting a list of configurations dictionaries")
         configs = [cls(**entry) for entry in dict_list]
