@@ -38,7 +38,7 @@ from .callbacks import UploadProgressReport, DownloadProgressReport
 from .util import quote_url
 from ..backend_api.session import Session
 from ..backend_api.utils import get_http_session_with_retry
-from ..backend_config.bucket_config import S3BucketConfigurations, GSBucketConfigurations, AzureContainerConfigurations
+from ..backend_config.bucket_config import S3BucketConfigurations, GSBucketConfigurations, AzureContainerConfigurations, GitLfsConfigurations
 from ..config import config, deferred_config
 from ..debugging import get_logger
 from ..errors import UsageError
@@ -1817,6 +1817,22 @@ class _FileStorageDriver(_Driver):
     def exists_file(self, container_name, object_name):
         return os.path.isfile(object_name)
 
+class _GitLfs(_Driver):
+
+    _containers = {}
+    scheme = 'git'
+    class _Container(object):
+
+        def __init__(self, name, cfg):
+            try:
+                from git import Repo
+            except ImportError:
+                raise UsageError(
+                    'GitPython not found. '
+                    'Please install driver using: pip install \"GitPython\"'
+                )
+            print(name)
+            print(cfg)
 
 class StorageHelper(object):
     """ Storage helper.
@@ -1928,6 +1944,8 @@ class StorageHelper(object):
     _gs_configurations = deferred_config('google.storage', {}, transform=GSBucketConfigurations.from_config)
     _azure_configurations = deferred_config('azure.storage', {}, transform=AzureContainerConfigurations.from_config)
     _path_substitutions = deferred_config(transform=_PathSubstitutionRule.load_list_from_config)
+
+    _gitlfs_configurations = deferred_config('git', {}, transform=None)
 
     @property
     def log(self):
@@ -2091,6 +2109,13 @@ class StorageHelper(object):
         elif self._scheme in _HttpDriver.schemes:
             self._driver = _HttpDriver(retries=retries)
             self._container = self._driver.get_container(container_name=self._base_url)
+
+        elif self._scheme in _GitLfs.scheme:
+            self._conf = copy(self._gitlfs_configurations.get_config_by_uri(url))
+            self._driver = _GitLfs()
+            self._container = self._driver.get_container(container_name=self._base_url, config=self._conf)
+
+
         else:  # elif self._scheme == 'file':
             # if this is not a known scheme assume local file
             # url2pathname is specifically intended to operate on (urlparse result).path
@@ -2833,6 +2858,8 @@ class StorageHelper(object):
                 if base_url.startswith(files_server):
                     return files_server
             return parsed.scheme + "://"
+        elif parsed.scheme in _GitLfs.scheme:
+            return base_url
         else:  # if parsed.scheme == 'file':
             # if we do not know what it is, we assume file
             return 'file://'

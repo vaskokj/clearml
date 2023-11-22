@@ -36,7 +36,7 @@ class S3BucketConfig(object):
     extra_args = attrib(type=dict, default=None)
 
     def update(
-        self, key, secret, multipart=True, region=None, use_credentials_chain=False, token="", extra_args=None
+            self, key, secret, multipart=True, region=None, use_credentials_chain=False, token="", extra_args=None
     ):
         self.key = key
         self.secret = secret
@@ -55,7 +55,7 @@ class S3BucketConfig(object):
     @classmethod
     def from_list(cls, dict_list, log=None):
         if not isinstance(dict_list, (tuple, list)) or not all(
-            isinstance(x, dict) for x in dict_list
+                isinstance(x, dict) for x in dict_list
         ):
             raise ValueError("Expecting a list of configurations dictionaries")
         configs = [cls(**entry) for entry in dict_list]
@@ -98,15 +98,15 @@ class BaseBucketConfigurations(object):
 
 class S3BucketConfigurations(BaseBucketConfigurations):
     def __init__(
-        self,
-        buckets=None,
-        default_key="",
-        default_secret="",
-        default_region="",
-        default_use_credentials_chain=False,
-        default_token="",
-        default_extra_args=None,
-        default_verify=None,
+            self,
+            buckets=None,
+            default_key="",
+            default_secret="",
+            default_region="",
+            default_use_credentials_chain=False,
+            default_token="",
+            default_extra_args=None,
+            default_verify=None,
     ):
         super(S3BucketConfigurations, self).__init__()
         self._buckets = buckets if buckets else list()
@@ -318,7 +318,7 @@ class GSBucketConfigurations(BaseBucketConfigurations):
         bucket_config.update(
             project=bucket_config.project or self._default_project,
             credentials_json=bucket_config.credentials_json
-            or self._default_credentials,
+                             or self._default_credentials,
             pool_connections=bucket_config.pool_connections or self._default_pool_connections,
             pool_maxsize=bucket_config.pool_maxsize or self._default_pool_maxsize
         )
@@ -441,7 +441,7 @@ class AzureContainerConfigurations(object):
                 if config.account_name == account_name and (
                     not config.container_name
                     or config.container_name == container
-                )
+            )
             ),
             None
         )
@@ -457,3 +457,72 @@ class AzureContainerConfigurations(object):
 
     def remove_config(self, bucket_config):
         self._container_configs.remove(bucket_config)
+
+    account_name = attrib(type=str)
+    account_key = attrib(type=str)
+    container_name = attrib(type=str, default=None)
+
+
+@attrs
+class GitLfsConfig(object):
+    token_name = attrib(type=str)
+    token = attrib(type=str)
+
+
+class GitLfsConfigurations(object):
+    token_name = attrib(type=str)
+    token = attrib(type=str)
+
+    def __init__(self, container_configs=None, default_account=None, default_key=None):
+        super(GitLfsConfigurations, self).__init__()
+        self._container_configs = container_configs or []
+        self._default_account = default_account
+        self._default_key = default_key
+
+    @classmethod
+    def from_config(cls, configuration):
+        default_token_name = getenv("GIT_TOKEN_NAME")
+        default_token = getenv("GIT_TOKEN")
+
+        default_container_configs = []
+        if default_token_name and default_token:
+            default_container_configs.append(GitLfsConfig(
+                token_name=default_token_name, token=default_token
+            ))
+
+        if configuration is None:
+            return cls(
+                default_container_configs,
+                default_account=default_token_name,
+                default_key=default_token
+            )
+
+        #container_configs = [GitLfsConfig(**entry) for entry in containers] + default_container_configs
+        container_configs = None #
+
+        return cls(container_configs, default_account=default_token_name, default_key=default_token)
+    def get_config_by_uri(self, uri):
+        """
+        Get the credentials for an Git Repository container from the config
+        :param uri: URI of Git repostiroy
+        :return: AzureContainerConfig: repostiroy config
+        """
+        f = furl.furl(uri)
+        account_name = f.host.partition(".")[0]
+
+        if not f.path.segments:
+            raise ValueError(
+                "URI {} is missing a container name (expected "
+                "[https/azure]://<account-name>.../<container-name>)".format(
+                    uri
+                )
+            )
+
+        container = f.path.segments[0]
+
+        config = copy(self.get_config(account_name, container))
+
+        if config and not config.container_name:
+            config.container_name = container
+
+        return config
