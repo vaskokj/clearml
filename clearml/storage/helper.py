@@ -38,7 +38,7 @@ from .callbacks import UploadProgressReport, DownloadProgressReport
 from .util import quote_url
 from ..backend_api.session import Session
 from ..backend_api.utils import get_http_session_with_retry
-from ..backend_config.bucket_config import S3BucketConfigurations, GSBucketConfigurations, AzureContainerConfigurations, GitLfsConfigurations
+from ..backend_config.bucket_config import S3BucketConfigurations, GSBucketConfigurations, AzureContainerConfigurations, GitLfsContainerConfigurations
 from ..config import config, deferred_config
 from ..debugging import get_logger
 from ..errors import UsageError
