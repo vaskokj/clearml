@@ -505,8 +505,8 @@ class GitLfsContainerConfigurations(object):
     def get_config_by_uri(self, uri):
         """
         Get the credentials for an Git Repository container from the config
-        :param uri: URI of Git repostiroy
-        :return: GitLfsContainerConfig: repostiroy config
+        :param uri: URI of Git repository
+        :return: GitLfsContainerConfig: repository config
         """
         f = furl.furl(uri)
         token_name = f.host.partition(".")[0]
@@ -519,7 +519,7 @@ class GitLfsContainerConfigurations(object):
                 )
             )
 
-        container = f.path.segments[0]
+        container = f.pathstr
 
         config = copy(self.get_config(token_name, container))
 

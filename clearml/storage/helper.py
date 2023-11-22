@@ -1945,7 +1945,7 @@ class StorageHelper(object):
     _azure_configurations = deferred_config('azure.storage', {}, transform=AzureContainerConfigurations.from_config)
     _path_substitutions = deferred_config(transform=_PathSubstitutionRule.load_list_from_config)
 
-    _gitlfs_configurations = deferred_config('git', {}, transform=None)
+    _gitlfs_configurations = deferred_config('git', {}, transform=GitLfsContainerConfigurations.from_config)
 
     @property
     def log(self):
