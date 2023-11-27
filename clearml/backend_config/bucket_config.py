@@ -473,34 +473,21 @@ class GitLfsContainerConfigurations(object):
     token_name = attrib(type=str)
     token = attrib(type=str)
 
-    def __init__(self, container_configs=None, token_name=None, token=None):
+    def __init__(self, token_name=None, token=None):
         super(GitLfsContainerConfigurations, self).__init__()
-        self._container_configs = container_configs or []
         self._token_name = token_name
         self._token = token
+        self._container_configs = []
 
     @classmethod
     def from_config(cls, configuration):
         default_token_name = getenv("GIT_TOKEN_NAME")
         default_token = getenv("GIT_TOKEN")
 
-        default_container_configs = []
-        if default_token_name and default_token:
-            default_container_configs.append(GitLfsContainerConfig(
-                token_name=default_token_name, token=default_token
-            ))
+        default_token_name = configuration.get("token_name", None)
+        default_credentials = configuration.get("token", None)
 
-        if configuration is None:
-            return cls(
-                default_container_configs,
-                token_name=default_token_name,
-                token=default_token
-            )
-
-        # container_configs = [GitLfsConfig(**entry) for entry in containers] + default_container_configs
-        container_configs = None
-
-        return cls(container_configs, token_name=default_token_name, token=default_token)
+        return cls(token_name=default_token_name, token=default_credentials)
 
     def get_config_by_uri(self, uri):
         """
@@ -521,12 +508,9 @@ class GitLfsContainerConfigurations(object):
 
         container = f.pathstr
 
-        config = copy(self.get_config(token_name, container))
+        #config = copy(self.get_config(token_name, container))
 
-        if config and not config.container_name:
-            config.container_name = container
-
-        return config
+        return self
 
     def get_config(self, account_name, container):
         return next(

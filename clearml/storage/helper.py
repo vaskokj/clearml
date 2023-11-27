@@ -38,7 +38,8 @@ from .callbacks import UploadProgressReport, DownloadProgressReport
 from .util import quote_url
 from ..backend_api.session import Session
 from ..backend_api.utils import get_http_session_with_retry
-from ..backend_config.bucket_config import S3BucketConfigurations, GSBucketConfigurations, AzureContainerConfigurations, GitLfsContainerConfigurations
+from ..backend_config.bucket_config import S3BucketConfigurations, GSBucketConfigurations, AzureContainerConfigurations, \
+    GitLfsContainerConfigurations
 from ..config import config, deferred_config
 from ..debugging import get_logger
 from ..errors import UsageError
@@ -289,7 +290,7 @@ class _HttpDriver(_Driver):
     def upload_object(self, file_path, container, object_name, extra, callback=None, **kwargs):
         with open(file_path, 'rb') as stream:
             return self.upload_object_via_stream(iterator=stream, container=container,
-                                                 object_name=object_name, extra=extra,  callback=callback, **kwargs)
+                                                 object_name=object_name, extra=extra, callback=callback, **kwargs)
 
     def exists_file(self, container_name, object_name):
         # noinspection PyBroadException
@@ -984,7 +985,7 @@ class _AzureBlobServiceStorageDriver(_Driver):
             return {key: int(max_connections)} if max_connections else {}
 
         def create_blob_from_data(
-            self, container_name, object_name, blob_name, data, max_connections=None,
+                self, container_name, object_name, blob_name, data, max_connections=None,
                 progress_callback=None, content_settings=None
         ):
             if self.__legacy:
@@ -1004,7 +1005,8 @@ class _AzureBlobServiceStorageDriver(_Driver):
                 )
 
         def create_blob_from_path(
-            self, container_name, blob_name, path, max_connections=None, content_settings=None, progress_callback=None
+                self, container_name, blob_name, path, max_connections=None, content_settings=None,
+                progress_callback=None
         ):
             if self.__legacy:
                 self.__blob_service.create_blob_from_path(
@@ -1103,7 +1105,7 @@ class _AzureBlobServiceStorageDriver(_Driver):
         return self._containers[container_name]
 
     def upload_object_via_stream(
-        self, iterator, container, object_name, callback=None, extra=None, max_connections=None, **kwargs
+            self, iterator, container, object_name, callback=None, extra=None, max_connections=None, **kwargs
     ):
         try:
             from azure.common import AzureHttpError  # noqa
@@ -1130,7 +1132,7 @@ class _AzureBlobServiceStorageDriver(_Driver):
         return False
 
     def upload_object(
-        self, file_path, container, object_name, callback=None, extra=None, max_connections=None, **kwargs
+            self, file_path, container, object_name, callback=None, extra=None, max_connections=None, **kwargs
     ):
         try:
             from azure.common import AzureHttpError  # noqa
@@ -1199,7 +1201,8 @@ class _AzureBlobServiceStorageDriver(_Driver):
             return blob
 
     def download_object(
-        self, obj, local_path, overwrite_existing=True, delete_on_failure=True, callback=None, max_connections=None, **_
+            self, obj, local_path, overwrite_existing=True, delete_on_failure=True, callback=None, max_connections=None,
+            **_
     ):
         p = Path(local_path)
         if not overwrite_existing and p.is_file():
@@ -1817,13 +1820,16 @@ class _FileStorageDriver(_Driver):
     def exists_file(self, container_name, object_name):
         return os.path.isfile(object_name)
 
+
 class _GitLfs(_Driver):
 
     _containers = {}
     scheme = 'git'
+
     class _Container(object):
 
         def __init__(self, name, cfg):
+
             try:
                 from git import Repo
             except ImportError:
@@ -1831,8 +1837,51 @@ class _GitLfs(_Driver):
                     'GitPython not found. '
                     'Please install driver using: pip install \"GitPython\"'
                 )
+            self.name = name
+            self.cfg = cfg
+            self.token = cfg._token
+            self.token_name = cfg._token_name
+
+
             print(name)
             print(cfg)
+    def test_upload(self, test_path, config, **kwargs):
+        pass
+
+    def upload_object_via_stream(self, iterator, container, object_name, extra, **kwargs):
+        pass
+
+    def list_container_objects(self, container, ex_prefix=None, **kwargs):
+        pass
+
+    def get_direct_access(self, remote_path, **kwargs):
+        pass
+
+    def download_object(self, obj, local_path, overwrite_existing, delete_on_failure, callback, **kwargs):
+        pass
+
+    def download_object_as_stream(self, obj, chunk_size, **kwargs):
+        pass
+
+    def delete_object(self, obj, **kwargs):
+        pass
+
+    def upload_object(self, file_path, container, object_name, extra, **kwargs):
+        pass
+
+    def get_object(self, container_name, object_name, **kwargs):
+        pass
+
+    def exists_file(self, container_name, object_name):
+        pass
+
+    def get_container(self, container_name, config=None, **kwargs):
+        if container_name not in self._containers:
+            self._containers[container_name] = self._Container(name=container_name, cfg=config)
+        return self._containers[container_name]
+
+
+
 
 class StorageHelper(object):
     """ Storage helper.
@@ -2021,17 +2070,17 @@ class StorageHelper(object):
         return helper.download_to_file(remote_url, local_path, skip_zero_size_check=skip_zero_size_check)
 
     def __init__(
-        self,
-        base_url,
-        url,
-        key=None,
-        secret=None,
-        region=None,
-        verbose=False,
-        logger=None,
-        retries=5,
-        token=None,
-        **kwargs
+            self,
+            base_url,
+            url,
+            key=None,
+            secret=None,
+            region=None,
+            verbose=False,
+            logger=None,
+            retries=5,
+            token=None,
+            **kwargs
     ):
         level = config.get("storage.log.level", None)
 
@@ -2114,7 +2163,6 @@ class StorageHelper(object):
             self._conf = copy(self._gitlfs_configurations.get_config_by_uri(url))
             self._driver = _GitLfs()
             self._container = self._driver.get_container(container_name=self._base_url, config=self._conf)
-
 
         else:  # elif self._scheme == 'file':
             # if this is not a known scheme assume local file
@@ -2440,6 +2488,9 @@ class StorageHelper(object):
         elif self._scheme == _GoogleCloudStorageDriver.scheme:
             self._driver.test_upload(test_path, self._conf)
 
+        elif self._scheme == _GitLfs.scheme:
+            pass
+
         elif self._scheme == 'file':
             # Check path exists
             Path(test_path).mkdir(parents=True, exist_ok=True)
@@ -2485,7 +2536,7 @@ class StorageHelper(object):
         return result_dest_path
 
     def upload(
-        self, src_path, dest_path=None, extra=None, async_enable=False, cb=None, retries=3, return_canonized=True
+            self, src_path, dest_path=None, extra=None, async_enable=False, cb=None, retries=3, return_canonized=True
     ):
         if not dest_path:
             dest_path = os.path.basename(src_path)
@@ -2503,6 +2554,7 @@ class StorageHelper(object):
             # quote link
             def callback(result):
                 return a_cb(quote_url(result_path, StorageHelper._quotable_uri_schemes) if result else result)
+
             # replace callback with wrapper
             cb = callback
 
@@ -2520,14 +2572,14 @@ class StorageHelper(object):
             return StorageHelper._upload_pool.apply_async(self._do_async_upload, args=(data,))
         else:
             res = self._do_upload(
-                    src_path=src_path,
-                    dest_path=dest_path,
-                    canonized_dest_path=canonized_dest_path,
-                    extra=extra,
-                    cb=cb,
-                    verbose=False,
-                    retries=retries,
-                    return_canonized=return_canonized)
+                src_path=src_path,
+                dest_path=dest_path,
+                canonized_dest_path=canonized_dest_path,
+                extra=extra,
+                cb=cb,
+                verbose=False,
+                retries=retries,
+                return_canonized=return_canonized)
             if res:
                 result_path = quote_url(result_path, StorageHelper._quotable_uri_schemes)
             return result_path
@@ -2907,7 +2959,9 @@ class StorageHelper(object):
 
     def _do_async_upload(self, data):
         assert isinstance(data, self._UploadData)
-        return self._do_upload(data.src_path, data.dest_path, data.canonized_dest_path, extra=data.extra, cb=data.callback, verbose=True, retries=data.retries, return_canonized=data.return_canonized)
+        return self._do_upload(data.src_path, data.dest_path, data.canonized_dest_path, extra=data.extra,
+                               cb=data.callback, verbose=True, retries=data.retries,
+                               return_canonized=data.return_canonized)
 
     def _upload_from_file(self, local_path, dest_path, extra=None):
         if not hasattr(self._driver, 'upload_object'):
@@ -2926,7 +2980,8 @@ class StorageHelper(object):
                 extra=extra)
         return res
 
-    def _do_upload(self, src_path, dest_path, canonized_dest_path, extra=None, cb=None, verbose=False, retries=1, return_canonized=False):
+    def _do_upload(self, src_path, dest_path, canonized_dest_path, extra=None, cb=None, verbose=False, retries=1,
+                   return_canonized=False):
         object_name = self._normalize_object_name(canonized_dest_path)
         if cb:
             try:
