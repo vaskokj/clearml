@@ -11,6 +11,7 @@ import shutil
 import sys
 import threading
 import uuid
+import tempfile
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
@@ -20,6 +21,7 @@ from multiprocessing.pool import ThreadPool
 from tempfile import mktemp
 from time import time
 from types import GeneratorType
+from git import Repo
 
 import requests
 import six
@@ -1849,6 +1851,18 @@ class _GitLfs(_Driver):
         pass
 
     def upload_object_via_stream(self, iterator, container, object_name, extra, **kwargs):
+        print(tempfile.gettempdir())
+        project_name = os.path.split(os.path.splitext(container.name)[0])[-1]
+        temp_repo_path = os.path.join(tempfile.gettempdir(),project_name)
+
+        parsed_git_path = urlparse(container.name)
+        parsed_git_path = parsed_git_path._replace(netloc=f'{container.token_name}:{container.token}@{urlparse(container.name).netloc}')
+        parsed_git_path = parsed_git_path._replace(scheme=f'https')
+        git_path_with_token = parsed_git_path.geturl()
+        if not os.path.exists(temp_repo_path):
+            Repo.clone_from(git_path_with_token, temp_repo_path)
+
+        print(os.getcwd())
         pass
 
     def list_container_objects(self, container, ex_prefix=None, **kwargs):
@@ -1879,8 +1893,6 @@ class _GitLfs(_Driver):
         if container_name not in self._containers:
             self._containers[container_name] = self._Container(name=container_name, cfg=config)
         return self._containers[container_name]
-
-
 
 
 class StorageHelper(object):
