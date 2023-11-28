@@ -12,6 +12,7 @@ import sys
 import threading
 import uuid
 import tempfile
+import stat
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
@@ -28,6 +29,7 @@ import six
 from _socket import gethostname
 from attr import attrs, attrib, asdict
 from furl import furl
+import pathlib
 from pathlib2 import Path
 from requests import codes as requests_codes
 from requests.exceptions import ConnectionError
@@ -1850,19 +1852,33 @@ class _GitLfs(_Driver):
     def test_upload(self, test_path, config, **kwargs):
         pass
 
+    # Used to remove the Git repository.
+    def del_rw(self, action, name, exc):
+        os.chmod(name, stat.S_IWRITE)
+        os.remove(name)
     def upload_object_via_stream(self, iterator, container, object_name, extra, **kwargs):
         print(tempfile.gettempdir())
         project_name = os.path.split(os.path.splitext(container.name)[0])[-1]
-        temp_repo_path = os.path.join(tempfile.gettempdir(),project_name)
+        temp_repo_path = os.path.join(tempfile.gettempdir(),f"clearml-gittmp", project_name)
+        full_object_path = os.path.join(temp_repo_path, object_name)
 
         parsed_git_path = urlparse(container.name)
         parsed_git_path = parsed_git_path._replace(netloc=f'{container.token_name}:{container.token}@{urlparse(container.name).netloc}')
         parsed_git_path = parsed_git_path._replace(scheme=f'https')
         git_path_with_token = parsed_git_path.geturl()
-        if not os.path.exists(temp_repo_path):
-            Repo.clone_from(git_path_with_token, temp_repo_path)
 
-        print(os.getcwd())
+        # Clear out the path so we don't over clone
+        if os.path.exists(temp_repo_path):
+            shutil.rmtree(temp_repo_path, onerror=self.del_rw)
+        clearml_repo = Repo.clone_from(git_path_with_token, temp_repo_path)
+        # if the test file already exists don't recreate it
+        if not next(iter(pathlib.Path(temp_repo_path).glob(".clearml.*.test") or []), None):
+            with open(full_object_path, "wb") as outfile:
+                # Copy the BytesIO stream to the output file
+                outfile.write(iterator.getbuffer())
+            clearml_repo.index.add(full_object_path)
+            clearml_repo.index.commit(f"adding {full_object_path} to repo")
+            git_result = clearml_repo.git.push("origin", clearml_repo.active_branch)
         pass
 
     def list_container_objects(self, container, ex_prefix=None, **kwargs):
