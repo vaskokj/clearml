@@ -2113,7 +2113,9 @@ class StorageHelper(object):
         elif self._scheme in _GitLfs.scheme:
             self._conf = copy(self._gitlfs_configurations.get_config_by_uri(url))
             self._driver = _GitLfs()
-            self._container = self._driver.get_container(container_name=self._base_url, config=self._conf)
+            self._container = self._driver.get_container(
+                container_name=self._base_url,
+                config=self._conf)
 
 
         else:  # elif self._scheme == 'file':

@@ -505,7 +505,7 @@ class GitLfsConfigurations(object):
         """
         Get the credentials for an Git Repository container from the config
         :param uri: URI of Git repostiroy
-        :return: AzureContainerConfig: repostiroy config
+        :return: GitLfsConfig: repostiroy config
         """
         f = furl.furl(uri)
         account_name = f.host.partition(".")[0]
