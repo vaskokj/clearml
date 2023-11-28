@@ -36,7 +36,7 @@ class S3BucketConfig(object):
     extra_args = attrib(type=dict, default=None)
 
     def update(
-        self, key, secret, multipart=True, region=None, use_credentials_chain=False, token="", extra_args=None
+            self, key, secret, multipart=True, region=None, use_credentials_chain=False, token="", extra_args=None
     ):
         self.key = key
         self.secret = secret
@@ -55,7 +55,7 @@ class S3BucketConfig(object):
     @classmethod
     def from_list(cls, dict_list, log=None):
         if not isinstance(dict_list, (tuple, list)) or not all(
-            isinstance(x, dict) for x in dict_list
+                isinstance(x, dict) for x in dict_list
         ):
             raise ValueError("Expecting a list of configurations dictionaries")
         configs = [cls(**entry) for entry in dict_list]
@@ -464,51 +464,39 @@ class AzureContainerConfigurations(object):
 
 
 @attrs
-class GitLfsConfig(object):
+class GitLfsContainerConfig(object):
     token_name = attrib(type=str)
     token = attrib(type=str)
 
 
-class GitLfsConfigurations(object):
+class GitLfsContainerConfigurations(object):
     token_name = attrib(type=str)
     token = attrib(type=str)
 
-    def __init__(self, container_configs=None, default_account=None, default_key=None):
-        super(GitLfsConfigurations, self).__init__()
-        self._container_configs = container_configs or []
-        self._default_account = default_account
-        self._default_key = default_key
+    def __init__(self, token_name=None, token=None):
+        super(GitLfsContainerConfigurations, self).__init__()
+        self._token_name = token_name
+        self._token = token
+        self._container_configs = []
 
     @classmethod
     def from_config(cls, configuration):
         default_token_name = getenv("GIT_TOKEN_NAME")
         default_token = getenv("GIT_TOKEN")
 
-        default_container_configs = []
-        if default_token_name and default_token:
-            default_container_configs.append(GitLfsConfig(
-                token_name=default_token_name, token=default_token
-            ))
+        default_token_name = configuration.get("token_name", None)
+        default_credentials = configuration.get("token", None)
 
-        if configuration is None:
-            return cls(
-                default_container_configs,
-                default_account=default_token_name,
-                default_key=default_token
-            )
+        return cls(token_name=default_token_name, token=default_credentials)
 
-        #container_configs = [GitLfsConfig(**entry) for entry in containers] + default_container_configs
-        container_configs = None #
-
-        return cls(container_configs, default_account=default_token_name, default_key=default_token)
     def get_config_by_uri(self, uri):
         """
         Get the credentials for an Git Repository container from the config
-        :param uri: URI of Git repostiroy
-        :return: GitLfsConfig: repostiroy config
+        :param uri: URI of Git repository
+        :return: GitLfsContainerConfig: repository config
         """
         f = furl.furl(uri)
-        account_name = f.host.partition(".")[0]
+        token_name = f.host.partition(".")[0]
 
         if not f.path.segments:
             raise ValueError(
@@ -518,11 +506,21 @@ class GitLfsConfigurations(object):
                 )
             )
 
-        container = f.path.segments[0]
+        container = f.pathstr
 
-        config = copy(self.get_config(account_name, container))
+        #config = copy(self.get_config(token_name, container))
 
-        if config and not config.container_name:
-            config.container_name = container
+        return self
 
-        return config
+    def get_config(self, account_name, container):
+        return next(
+            (
+                config
+                for config in self._container_configs
+                if config.account_name == account_name and (
+                    not config.container_name
+                    or config.container_name == container
+                )
+            ),
+            None
+        )
