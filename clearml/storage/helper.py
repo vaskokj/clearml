@@ -22,6 +22,8 @@ from multiprocessing.pool import ThreadPool
 from tempfile import mktemp
 from time import time
 from types import GeneratorType
+
+import git
 from git import Repo
 
 import requests
@@ -1853,13 +1855,35 @@ class _GitLfs(_Driver):
         pass
 
     # Used to remove the Git repository.
-    def del_rw(self, action, name, exc):
+    def _del_rw(self, action, name, exc):
         os.chmod(name, stat.S_IWRITE)
         os.remove(name)
+
+    def _repo_sync_local(self, repo_path, credentialed_url=None):
+
+        # if folder exists assume it's a git repo could check with Repo(repo_path) but need to handle exception
+        repo = None
+        if os.path.exists(repo_path):
+            repo = git.Repo(repo_path)
+            origin = repo.remotes.origin
+            origin.pull()
+        else:
+            repo = Repo.clone_from(credentialed_url, repo_path)
+        return repo
+
+    def _repo_commit(self, repo, msg):
+        repo.index.commit(f"{msg}")
+        repo.git.push("origin")
+
+    def _repo_add_file(self, repo, file_path):
+        repo.index.add(file_path)
+        message = f"adding {file_path} to repo"
+        self._repo_commit(repo, message)
+
     def upload_object_via_stream(self, iterator, container, object_name, extra, **kwargs):
-        print(tempfile.gettempdir())
+
         project_name = os.path.split(os.path.splitext(container.name)[0])[-1]
-        temp_repo_path = os.path.join(tempfile.gettempdir(),f"clearml-gittmp", project_name)
+        temp_repo_path = os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name)
         full_object_path = os.path.join(temp_repo_path, object_name)
 
         parsed_git_path = urlparse(container.name)
@@ -1868,17 +1892,13 @@ class _GitLfs(_Driver):
         git_path_with_token = parsed_git_path.geturl()
 
         # Clear out the path so we don't over clone
-        if os.path.exists(temp_repo_path):
-            shutil.rmtree(temp_repo_path, onerror=self.del_rw)
-        clearml_repo = Repo.clone_from(git_path_with_token, temp_repo_path)
+        clearml_repo = self._repo_sync_local(temp_repo_path, git_path_with_token)
         # if the test file already exists don't recreate it
-        if not next(iter(pathlib.Path(temp_repo_path).glob(".clearml.*.test") or []), None):
-            with open(full_object_path, "wb") as outfile:
-                # Copy the BytesIO stream to the output file
-                outfile.write(iterator.getbuffer())
-            clearml_repo.index.add(full_object_path)
-            clearml_repo.index.commit(f"adding {full_object_path} to repo")
-            git_result = clearml_repo.git.push("origin", clearml_repo.active_branch)
+        with open(full_object_path, "wb") as outfile:
+            # Copy the BytesIO stream to the output file
+            outfile.write(iterator.getbuffer())
+        self._repo_add_file(clearml_repo, full_object_path)
+
         pass
 
     def list_container_objects(self, container, ex_prefix=None, **kwargs):
@@ -1894,13 +1914,24 @@ class _GitLfs(_Driver):
         pass
 
     def delete_object(self, obj, **kwargs):
-        pass
+        repo = obj[0]
+        file = obj[1]
+        repo.index.remove([file])
+        os.remove(file)
+        message = f"removed {file}"
+        self._repo_commit(repo, message)
+
 
     def upload_object(self, file_path, container, object_name, extra, **kwargs):
         pass
 
     def get_object(self, container_name, object_name, **kwargs):
-        pass
+
+        # return a repo, file object so we can delete and commit
+        project_name = os.path.split(os.path.splitext(container_name)[0])[-1]
+        temp_repo_path = os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name)
+        full_object_path = os.path.join(temp_repo_path, object_name)
+        return [Repo(temp_repo_path), full_object_path]
 
     def exists_file(self, container_name, object_name):
         pass
