@@ -1848,7 +1848,6 @@ class _GitLfs(_Driver):
             self.token = cfg._token
             self.token_name = cfg._token_name
 
-
             print(name)
             print(cfg)
     def test_upload(self, test_path, config, **kwargs):
@@ -1914,6 +1913,7 @@ class _GitLfs(_Driver):
         pass
 
     def delete_object(self, obj, **kwargs):
+
         repo = obj[0]
         file = obj[1]
         repo.index.remove([file])
