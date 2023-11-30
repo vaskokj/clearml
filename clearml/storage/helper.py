@@ -1851,6 +1851,7 @@ class _GitLfs(_Driver):
             print(name)
             print(cfg)
     def test_upload(self, test_path, config, **kwargs):
+        # Todo: implement, might not even be necessary since we are dealing with local files
         pass
 
     # Used to remove the Git repository.
@@ -1923,6 +1924,10 @@ class _GitLfs(_Driver):
 
 
     def upload_object(self, file_path, container, object_name, extra, **kwargs):
+        # parse container.name
+        # copy file_path to container.name
+        container_name = list(self._containers.keys())[0]
+        container.name.replace(container_name, '')
         pass
 
     def get_object(self, container_name, object_name, **kwargs):
@@ -2550,7 +2555,7 @@ class StorageHelper(object):
             self._driver.test_upload(test_path, self._conf)
 
         elif self._scheme == _GitLfs.scheme:
-            pass
+            self._driver.test_upload(test_path, self._conf)
 
         elif self._scheme == 'file':
             # Check path exists
