@@ -1851,7 +1851,7 @@ class _GitLfs(_Driver):
             print(name)
             print(cfg)
     def test_upload(self, test_path, config, **kwargs):
-        # Todo: implement, might not even be necessary since we are dealing with local files
+        # implement, might not even be necessary since we are dealing with local files
         pass
 
     # Used to remove the Git repository.
