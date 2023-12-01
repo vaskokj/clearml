@@ -467,11 +467,13 @@ class AzureContainerConfigurations(object):
 class GitLfsContainerConfig(object):
     token_name = attrib(type=str)
     token = attrib(type=str)
+    storage_path = attrib(type=str)
 
 
 class GitLfsContainerConfigurations(object):
     token_name = attrib(type=str)
     token = attrib(type=str)
+    storage_path = attrib(type=str)
 
     def __init__(self, token_name=None, token=None):
         super(GitLfsContainerConfigurations, self).__init__()

@@ -1848,8 +1848,6 @@ class _GitLfs(_Driver):
             self.token = cfg._token
             self.token_name = cfg._token_name
 
-            print(name)
-            print(cfg)
     def test_upload(self, test_path, config, **kwargs):
         # implement, might not even be necessary since we are dealing with local files
         pass
@@ -1880,6 +1878,9 @@ class _GitLfs(_Driver):
         message = f"adding {file_path} to repo"
         self._repo_commit(repo, message)
 
+    def _get_repo(self, project_name):
+        return Repo(os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name))
+
     def upload_object_via_stream(self, iterator, container, object_name, extra, **kwargs):
 
         project_name = os.path.split(os.path.splitext(container.name)[0])[-1]
@@ -1905,7 +1906,14 @@ class _GitLfs(_Driver):
         pass
 
     def get_direct_access(self, remote_path, **kwargs):
-        pass
+        ### need to verify repo exists...
+
+        base_url = remote_path[:remote_path.find(".git") + 4]
+        relative_file_path = remote_path.replace(base_url, "")
+        project_name = os.path.split(os.path.splitext(base_url)[0])[-1]
+        temp_repo_path = os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name)
+        full_object_path = Path(temp_repo_path + relative_file_path).as_posix()
+        return full_object_path
 
     def download_object(self, obj, local_path, overwrite_existing, delete_on_failure, callback, **kwargs):
         pass
@@ -1926,13 +1934,34 @@ class _GitLfs(_Driver):
     def upload_object(self, file_path, container, object_name, extra, **kwargs):
         # parse container.name
         # copy file_path to container.name
-        container_name = list(self._containers.keys())[0]
-        destination_path = container.name.replace(f"{container_name}/", "")
-        project_name = os.path.split(os.path.splitext(container_name)[0])[-1]
+
+        # need to check to make sure folders exists...other wise clone it
+
+        # get the file paths we need to make.
+        base_url = container.name[:container.name.find(".git") + 4]
+        relative_file_path = Path(container.name.replace(base_url, ""))
+        project_name = os.path.splitext(os.path.basename(base_url))[0]
+        relative_folder_path = relative_file_path.parent
+
+        #container_dir_name = list(self._containers.keys())[0]
+        #relative_file_path = Path(container.name.replace(f"{container_dir_name}/", ""))
+
         temp_repo_path = os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name)
-        full_container_path = os.path.join(temp_repo_path, object_name)
-        container.name.replace(container_name, '')
-        pass
+        full_file_path = Path(temp_repo_path + str(relative_file_path))
+        full_folder_path = Path(temp_repo_path + str(relative_folder_path))
+
+
+        full_folder_path.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.copy(file_path, full_file_path)
+            repo = self._get_repo(project_name)
+            self._repo_add_file(repo, full_file_path)
+            return True
+        except FileNotFoundError:
+            return False
+            print("{!r} could not be found".format(dest))
+
+
 
     def get_object(self, container_name, object_name, **kwargs):
 
