@@ -1927,6 +1927,10 @@ class _GitLfs(_Driver):
         # parse container.name
         # copy file_path to container.name
         container_name = list(self._containers.keys())[0]
+        destination_path = container.name.replace(f"{container_name}/", "")
+        project_name = os.path.split(os.path.splitext(container_name)[0])[-1]
+        temp_repo_path = os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name)
+        full_container_path = os.path.join(temp_repo_path, object_name)
         container.name.replace(container_name, '')
         pass
 
