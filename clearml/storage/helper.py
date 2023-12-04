@@ -1870,16 +1870,20 @@ class _GitLfs(_Driver):
         return repo
 
     def _repo_commit(self, repo, msg):
-        repo.index.commit(f"{msg}")
+        try:
+            repo.git.commit("-m", f"{msg}")
+        except git.GitCommandError as e:
+            pass
         repo.git.push("origin")
 
     def _repo_add_file(self, repo, file_path):
-        repo.index.add(file_path)
+        repo_add_result = repo.git.add(file_path)
         message = f"adding {file_path} to repo"
         self._repo_commit(repo, message)
 
     def _get_repo(self, project_name):
-        return Repo(os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name))
+        repo = self._repo_sync_local(os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name))
+        return repo
 
     def upload_object_via_stream(self, iterator, container, object_name, extra, **kwargs):
 
