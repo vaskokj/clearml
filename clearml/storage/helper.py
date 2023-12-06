@@ -1939,20 +1939,16 @@ class _GitLfs(_Driver):
         # parse container.name
         # copy file_path to container.name
 
-        # need to check to make sure folders exists...other wise clone it
+        # need to check to make sure folders exists...otherwise clone it
 
         # get the file paths we need to make.
         base_url = container.name[:container.name.find(".git") + 4]
         relative_file_path = Path(container.name.replace(base_url, ""))
         project_name = os.path.splitext(os.path.basename(base_url))[0]
-        relative_folder_path = relative_file_path.parent
 
-        #container_dir_name = list(self._containers.keys())[0]
-        #relative_file_path = Path(container.name.replace(f"{container_dir_name}/", ""))
-
-        temp_repo_path = os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name)
-        full_file_path = Path(temp_repo_path + str(relative_file_path))
-        full_folder_path = Path(temp_repo_path + str(relative_folder_path))
+        temp_repo_path = os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name) + "\\"
+        full_file_path = Path(temp_repo_path + str(object_name))
+        full_folder_path = full_file_path.parent
 
 
         full_folder_path.mkdir(parents=True, exist_ok=True)
@@ -3014,6 +3010,8 @@ class StorageHelper(object):
                     return files_server
             return parsed.scheme + "://"
         elif parsed.scheme in _GitLfs.scheme:
+            path_url = parsed.path[:parsed.path.find(".git") + 4]
+            base_url = f"{parsed.scheme}://{parsed.netloc}{path_url}"
             return base_url
         else:  # if parsed.scheme == 'file':
             # if we do not know what it is, we assume file
@@ -3056,7 +3054,7 @@ class StorageHelper(object):
             if path.startswith('/') and os.name == 'nt':
                 path = path[1:]
         if self.scheme in (_Boto3Driver.scheme, _GoogleCloudStorageDriver.scheme,
-                           _AzureBlobServiceStorageDriver.scheme):
+                           _AzureBlobServiceStorageDriver.scheme, _GitLfs.scheme):
             path = path.lstrip('/')
         return path
 
