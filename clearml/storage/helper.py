@@ -1828,7 +1828,6 @@ class _FileStorageDriver(_Driver):
 
 
 class _GitLfs(_Driver):
-
     _containers = {}
     scheme = 'git'
 
@@ -1885,6 +1884,15 @@ class _GitLfs(_Driver):
         repo = self._repo_sync_local(os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name))
         return repo
 
+    def _generate_tokenized_git(self, container):
+
+        parsed_git_path = urlparse(container.name)
+        parsed_git_path = parsed_git_path._replace(
+            netloc=f'{container.token_name}:{container.token}@{urlparse(container.name).netloc}')
+        parsed_git_path = parsed_git_path._replace(scheme=f'https')
+        git_path_with_token = parsed_git_path.geturl()
+        return git_path_with_token
+
     def upload_object_via_stream(self, iterator, container, object_name, extra, **kwargs):
 
         project_name = os.path.split(os.path.splitext(container.name)[0])[-1]
@@ -1892,7 +1900,8 @@ class _GitLfs(_Driver):
         full_object_path = os.path.join(temp_repo_path, object_name)
 
         parsed_git_path = urlparse(container.name)
-        parsed_git_path = parsed_git_path._replace(netloc=f'{container.token_name}:{container.token}@{urlparse(container.name).netloc}')
+        parsed_git_path = parsed_git_path._replace(
+            netloc=f'{container.token_name}:{container.token}@{urlparse(container.name).netloc}')
         parsed_git_path = parsed_git_path._replace(scheme=f'https')
         git_path_with_token = parsed_git_path.geturl()
 
@@ -1910,30 +1919,43 @@ class _GitLfs(_Driver):
         pass
 
     def get_direct_access(self, remote_path, **kwargs):
-        ### need to verify repo exists...
 
         base_url = remote_path[:remote_path.find(".git") + 4]
         relative_file_path = remote_path.replace(base_url, "")
         project_name = os.path.split(os.path.splitext(base_url)[0])[-1]
         temp_repo_path = os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name)
+        # if the project doesn't exist locally clone it down.
+        # could optimize this as we could just "get" the files we explicitly need but this could get tricky...
+        if not os.path.isdir(temp_repo_path):
+            self._repo_sync_local(temp_repo_path, self._generate_tokenized_git(self._containers[base_url]))
         full_object_path = Path(temp_repo_path + relative_file_path).as_posix()
         return full_object_path
 
-    def download_object(self, obj, local_path, overwrite_existing, delete_on_failure, callback, **kwargs):
-        pass
+    def download_object(self, obj, local_path, overwrite_existing=True, delete_on_failure=True, callback=None, **_):
+        try:
+            shutil.copy(obj.full_object_path, local_path)
+        except IOError:
+            if delete_on_failure:
+                # noinspection PyBroadException
+                try:
+                    os.unlink(local_path)
+                except Exception:
+                    pass
+            return False
+        return True
+
 
     def download_object_as_stream(self, obj, chunk_size, **kwargs):
         pass
 
     def delete_object(self, obj, **kwargs):
 
-        repo = obj[0]
-        file = obj[1]
+        repo = obj.repo
+        file = obj.full_object_path
         repo.index.remove([file])
         os.remove(file)
         message = f"removed {file}"
         self._repo_commit(repo, message)
-
 
     def upload_object(self, file_path, container, object_name, extra, **kwargs):
         # parse container.name
@@ -1950,7 +1972,6 @@ class _GitLfs(_Driver):
         full_file_path = Path(temp_repo_path + str(object_name))
         full_folder_path = full_file_path.parent
 
-
         full_folder_path.mkdir(parents=True, exist_ok=True)
         try:
             shutil.copy(file_path, full_file_path)
@@ -1961,23 +1982,37 @@ class _GitLfs(_Driver):
             return False
             print("{!r} could not be found".format(dest))
 
-
-
     def get_object(self, container_name, object_name, **kwargs):
 
         # return a repo, file object so we can delete and commit
+
+        # probably need to validate we have a copy local.
         project_name = os.path.split(os.path.splitext(container_name)[0])[-1]
         temp_repo_path = os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name)
         full_object_path = os.path.join(temp_repo_path, object_name)
-        return [Repo(temp_repo_path), full_object_path]
+        obj = _GitLfsObjectContainer(Repo(temp_repo_path), full_object_path, os.stat(full_object_path),
+                               None, f"{container_name}/{object_name}")
+
+        return obj
 
     def exists_file(self, container_name, object_name):
-        pass
+        # need to get the repo location validate it exists.
+        obj = self.get_object(container_name, object_name)
+        return os.path.isfile(obj.full_object_path)
 
     def get_container(self, container_name, config=None, **kwargs):
         if container_name not in self._containers:
             self._containers[container_name] = self._Container(name=container_name, cfg=config)
         return self._containers[container_name]
+
+
+class _GitLfsObjectContainer(object):
+    def __init__(self, repo, full_object_path, filestat, name, url):
+        self.repo = repo
+        self.full_object_path = full_object_path
+        self.filestat = filestat
+        self.name = name
+        self.url = url
 
 
 class StorageHelper(object):
@@ -2529,6 +2564,15 @@ class StorageHelper(object):
                 try:
                     # To catch botocore exceptions
                     size = obj.content_length  # noqa
+                except Exception as e:
+                    if not silence_errors:
+                        self.log.warning("Failed obtaining content_length while getting object size: {}('{}')".format(
+                            e.__class__.__name__, str(e)))
+            ## Getting local GitLFS file size.
+            # Poor way to do this but getting something working for MVP
+            elif hasattr(obj.filestat, "st_size"):
+                try:
+                    size = obj.filestat.st_size
                 except Exception as e:
                     if not silence_errors:
                         self.log.warning("Failed obtaining content_length while getting object size: {}('{}')".format(
