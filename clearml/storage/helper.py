@@ -1968,7 +1968,7 @@ class _GitLfs(_Driver):
         relative_file_path = Path(container.name.replace(base_url, ""))
         project_name = os.path.splitext(os.path.basename(base_url))[0]
 
-        temp_repo_path = os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name) + "\\"
+        temp_repo_path = os.path.join(tempfile.gettempdir(), f"clearml-gittmp", project_name) + os.sep
         full_file_path = Path(temp_repo_path + str(object_name))
         full_folder_path = full_file_path.parent
 
